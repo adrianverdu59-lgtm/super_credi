@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/services/bcv_service.dart';
+import '../../core/services/supabase_service.dart';
+import '../../shared/models/payment_model.dart';
 
 class PagoMovilScreen extends StatefulWidget {
   final double installmentAmountUsd;
@@ -24,6 +25,7 @@ class _PagoMovilScreenState extends State<PagoMovilScreen> {
   String _selectedBank = '0102 - Banco de Venezuela';
   late double _currentBcvRate;
   bool _isLoadingRate = true;
+  bool _isSubmitting = false;
 
   final List<String> _banks = [
     '0102 - Banco de Venezuela',
@@ -58,29 +60,61 @@ class _PagoMovilScreenState extends State<PagoMovilScreen> {
     super.dispose();
   }
 
-  void _submitPayment() {
+  void _submitPayment() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isSubmitting = true);
+
       final totalVes = widget.installmentAmountUsd * _currentBcvRate;
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Pago Registrado'),
-          content: Text(
-            'Referencia: ${_referenceController.text}\n'
-            'Monto: Bs. ${totalVes.toStringAsFixed(2)}\n'
-            'Estatus: En verificación por Administración.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              child: const Text('Aceptar'),
-            ),
-          ],
-        ),
+
+      final payment = PaymentModel(
+        id: '',
+        loanId: 'demo-loan-id',
+        userId: 'demo-user-id',
+        amountUsd: widget.installmentAmountUsd,
+        bcvRate: _currentBcvRate,
+        amountVes: totalVes,
+        bankOrigin: _selectedBank,
+        phoneSender: _phoneController.text,
+        referenceNumber: _referenceController.text,
+        status: 'under_review',
+        createdAt: DateTime.now(),
       );
+
+      final success = await SupabaseService.submitPayment(payment);
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+
+        if (success) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Pago Registrado'),
+              content: Text(
+                'Referencia: ${_referenceController.text}\n'
+                'Monto: Bs. ${totalVes.toStringAsFixed(2)}\n'
+                'Estatus: Registrado exitosamente para revisión.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Aceptar'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error al enviar el pago. Intenta de nuevo.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -181,8 +215,14 @@ class _PagoMovilScreenState extends State<PagoMovilScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitPayment,
-                  child: const Text('REGISTRAR PAGO'),
+                  onPressed: _isSubmitting ? null : _submitPayment,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('REGISTRAR PAGO'),
                 ),
               ),
             ],
