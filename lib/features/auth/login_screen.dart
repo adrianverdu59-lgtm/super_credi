@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../payments/pago_movil_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,16 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   final _supabase = Supabase.instance.client;
+
+  void _navigateToHome() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PaymentFormScreen(loanId: 'default-loan'),
+      ),
+    );
+  }
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
@@ -41,7 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isSignUp) {
-        // Registrar usuario
         final AuthResponse res = await _supabase.auth.signUp(
           email: email,
           password: password,
@@ -51,12 +61,12 @@ class _LoginScreenState extends State<LoginScreen> {
         if (res.user != null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('¡Cuenta creada con éxito! Se ha iniciado sesión.')),
+              const SnackBar(content: Text('¡Cuenta creada con éxito!')),
             );
+            _navigateToHome();
           }
         }
       } else {
-        // Iniciar sesión
         await _supabase.auth.signInWithPassword(
           email: email,
           password: password,
@@ -66,6 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('¡Sesión iniciada correctamente!')),
           );
+          _navigateToHome();
         }
       }
     } on AuthException catch (error) {
